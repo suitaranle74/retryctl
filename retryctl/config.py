@@ -1,65 +1,45 @@
-"""File-based configuration for retryctl (TOML / JSON / plain dict)."""
+"""File-based configuration for retryctl."""
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 
 @dataclass
 class FileConfig:
-    # backoff
-    max_attempts: int = 3
-    base_delay: float = 1.0
-    max_delay: float = 60.0
+    # Backoff
+    initial_delay: float = 1.0
     multiplier: float = 2.0
-    jitter: bool = True
+    max_delay: float = 60.0
+    jitter: bool = False
+    max_attempts: int = 3
 
-    # runner
+    # Alerts
+    alert_on_failure: bool = False
+    alert_on_success: bool = False
+    alert_shell_hook: Optional[str] = None
+
+    # Runner
     timeout: Optional[float] = None
-    success_codes: List[int] = field(default_factory=lambda: [0])
+    shell: bool = False
 
-    # alerts
-    on_failure_hook: Optional[str] = None
-    on_success_hook: Optional[str] = None
-
-    # journal
-    journal_path: Optional[str] = None
+    # Conditions
+    retry_on_exit_codes: List[int] = field(default_factory=list)
+    no_retry_on_exit_codes: List[int] = field(default_factory=list)
+    retry_on_output_pattern: Optional[str] = None
+    no_retry_on_output_pattern: Optional[str] = None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "FileConfig":
-        known = {f for f in cls.__dataclass_fields__}  # type: ignore[attr-defined]
+    def from_dict(cls, data: dict) -> "FileConfig":
+        known = cls.__dataclass_fields__.keys()  # type: ignore[attr-defined]
         filtered = {k: v for k, v in data.items() if k in known}
         return cls(**filtered)
 
 
-def load_config(path: Optional[str]) -> FileConfig:
-    """Load a FileConfig from *path* (JSON or TOML) or return defaults."""
-    if path is None:
-        return FileConfig()
-
-    p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"Config file not found: {path}")
-
-    suffix = p.suffix.lower()
-
-    if suffix == ".json":
-        data: Dict[str, Any] = json.loads(p.read_text())
-        return FileConfig.from_dict(data)
-
-    if suffix == ".toml":
-        try:
-            import tomllib  # type: ignore  # Python 3.11+
-        except ImportError:
-            try:
-                import tomli as tomllib  # type: ignore
-            except ImportError as exc:  # pragma: no cover
-                raise ImportError(
-                    "TOML support requires Python 3.11+ or 'tomli' package."
-                ) from exc
-        data = tomllib.loads(p.read_text(encoding="utf-8"))
-        return FileConfig.from_dict(data)
-
-    raise ValueError(f"Unsupported config format: {suffix!r}. Use .json or .toml.")
+def load_config(path: str) -> FileConfig:
+    """Load a FileConfig from a JSON file."""
+    text = Path(path).read_text(encoding="utf-8")
+    data = json.loads(text)
+    return FileConfig.from_dict(data)
