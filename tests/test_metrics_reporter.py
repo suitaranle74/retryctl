@@ -59,3 +59,18 @@ class TestMetricsReporter:
         assert data["total_attempts"] == 2
         assert data["succeeded"] is False
         assert data["attempt_exit_codes"] == [2, 2]
+
+    def test_report_output_is_valid_json_for_multiple_attempts(self):
+        """Ensure the stream output is valid JSON even across multiple attempts."""
+        stream = io.StringIO()
+        reporter = MetricsReporter(config=MetricsConfig(), stream=stream)
+        rm = RunMetrics(command="flaky-cmd")
+        rm.record_attempt(1, 1, 0.1)
+        rm.record_attempt(2, 1, 0.2)
+        rm.record_attempt(3, 0, 0.3)
+        rm.finish()
+        reporter.report(rm)
+        data = json.loads(stream.getvalue())
+        assert data["total_attempts"] == 3
+        assert data["succeeded"] is True
+        assert data["attempt_exit_codes"] == [1, 1, 0]
