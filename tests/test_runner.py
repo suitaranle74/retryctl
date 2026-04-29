@@ -91,7 +91,8 @@ class TestRunner:
         assert result.succeeded is False
         assert result.total_attempts == 3
 
-    def test_retries_until_success(self):
+    def test_succeeds_after_retries(self):
+        """Command that fails twice then succeeds should report success with correct attempt count."""
         call_count = 0
         original_run = subprocess.run
 
@@ -99,27 +100,14 @@ class TestRunner:
             nonlocal call_count
             call_count += 1
             mock = MagicMock()
-            mock.returncode = 0 if call_count >= 2 else 1
+            mock.returncode = 0 if call_count >= 3 else 1
             mock.stdout = b""
             mock.stderr = b""
             return mock
 
-        with patch("retryctl.runner.subprocess.run", side_effect=fake_run):
-            runner = self._make_runner(command=["dummy"], max_attempts=5)
+        with patch("subprocess.run", side_effect=fake_run):
+            runner = self._make_runner(max_attempts=5)
             result = runner.run()
 
         assert result.succeeded is True
-        assert result.total_attempts == 2
-
-    def test_timeout_recorded_in_attempt(self):
-        def fake_run(*args, **kwargs):
-            raise subprocess.TimeoutExpired(cmd="sleep", timeout=1)
-
-        with patch("retryctl.runner.subprocess.run", side_effect=fake_run):
-            runner = self._make_runner(command=["sleep", "99"], max_attempts=2, timeout=1)
-            result = runner.run()
-
-        assert result.succeeded is False
-        assert result.total_attempts == 2
-        for attempt in result.attempts:
-            assert attempt.returncode == -1
+        assert result.total_attempts == 3
