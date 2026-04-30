@@ -91,3 +91,16 @@ class TestRateLimiter:
         for _ in range(5):
             rl.acquire()
         assert len(rl._attempt_times) == 5
+
+    def test_acquire_returns_total_wait_time(self):
+        """acquire() should return the total seconds slept, not just 0."""
+        rl = self._make(max_attempts_per_minute=2)
+        fake_times = [0.0, 1.0, 2.0, 63.0]
+        call_iter = iter(fake_times)
+
+        with patch("retryctl.rate_limiter.time.monotonic", side_effect=lambda: next(call_iter)):
+            with patch("retryctl.rate_limiter.time.sleep"):
+                rl._attempt_times = [0.0, 1.0]
+                waited = rl.acquire()
+
+        assert waited > 0.0
