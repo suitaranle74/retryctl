@@ -1,4 +1,4 @@
-"""File-based configuration dataclass for retryctl."""
+"""File-based configuration for retryctl."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -8,92 +8,92 @@ import os
 
 
 @dataclass
-class FileConfig:
-    # Backoff
-    initial_delay: Optional[float] = None
-    max_delay: Optional[float] = None
-    multiplier: Optional[float] = None
-    max_attempts: Optional[int] = None
-    # Alert
-    alert_command: Optional[str] = None
-    alert_on_failure: Optional[bool] = None
-    # Runner
-    command: Optional[List[str]] = None
-    # Condition
+class FileConfig:  # noqa: too-many-instance-attributes
+    # backoff
+    initial_delay: float = 1.0
+    multiplier: float = 2.0
+    max_delay: float = 60.0
+    max_attempts: int = 5
+    # alerts
+    alert_enabled: bool = False
+    alert_on_failure: bool = True
+    alert_on_success: bool = False
+    alert_shell_hook: Optional[str] = None
+    # runner
+    command: List[str] = field(default_factory=list)
+    # condition
     retry_exit_codes: Optional[List[int]] = None
     retry_output_patterns: Optional[List[str]] = None
-    # Timeout
+    # timeout
     attempt_timeout: Optional[float] = None
     total_timeout: Optional[float] = None
-    # Throttle
-    throttle_enabled: Optional[bool] = None
-    throttle_threshold: Optional[int] = None
-    throttle_window: Optional[float] = None
-    # Jitter
-    jitter_strategy: Optional[str] = None
-    jitter_max: Optional[float] = None
-    # Labels
-    labels: Optional[Dict[str, str]] = None
+    # throttle
+    throttle_enabled: bool = False
+    throttle_threshold: int = 5
+    throttle_window: float = 60.0
+    throttle_pause: float = 10.0
+    # jitter
+    jitter_strategy: str = "none"
+    jitter_max: float = 1.0
+    # labels
+    labels: Dict[str, str] = field(default_factory=dict)
     job_name: Optional[str] = None
-    # Budget
-    budget_enabled: Optional[bool] = None
-    budget_max_retries: Optional[int] = None
-    budget_window: Optional[float] = None
-    # Dead letter
-    deadletter_enabled: Optional[bool] = None
+    # budget
+    budget_enabled: bool = False
+    budget_max_retries: int = 10
+    budget_window: float = 3600.0
+    # deadletter
+    deadletter_enabled: bool = False
     deadletter_path: Optional[str] = None
-    # Snapshot
-    snapshot_enabled: Optional[bool] = None
+    # snapshot
+    snapshot_enabled: bool = False
     snapshot_path: Optional[str] = None
-    # Circuit breaker
-    circuit_breaker_enabled: Optional[bool] = None
-    circuit_breaker_failure_threshold: Optional[int] = None
-    circuit_breaker_recovery_timeout: Optional[float] = None
-    # Concurrency
-    max_concurrency: Optional[int] = None
-    # Drain
-    drain_enabled: Optional[bool] = None
-    drain_signal: Optional[str] = None
-    drain_timeout: Optional[float] = None
-    # Checkpoint
-    checkpoint_enabled: Optional[bool] = None
+    snapshot_max: int = 10
+    # circuit breaker
+    circuit_breaker_enabled: bool = False
+    circuit_breaker_failure_threshold: int = 5
+    circuit_breaker_recovery_timeout: float = 30.0
+    # concurrency
+    concurrency_max: Optional[int] = None
+    # checkpoint
+    checkpoint_enabled: bool = False
     checkpoint_path: Optional[str] = None
-    # Trace
-    trace_enabled: Optional[bool] = None
-    trace_header_name: Optional[str] = None
-    trace_id: Optional[str] = None
-    # Warmup
-    warmup_enabled: Optional[bool] = None
-    warmup_attempts: Optional[int] = None
-    warmup_delay: Optional[float] = None
-    # Policy
-    policy_name: Optional[str] = None
-    # Audit
-    audit_enabled: Optional[bool] = None
+    # trace
+    trace_enabled: bool = False
+    trace_header_name: str = "X-Trace-ID"
+    trace_propagate: bool = False
+    # warmup
+    warmup_enabled: bool = False
+    warmup_attempts: int = 1
+    warmup_delay: float = 0.0
+    # policy
+    policy_mode: str = "default"
+    # audit
+    audit_enabled: bool = False
     audit_output_file: Optional[str] = None
-    # Sampling
-    sampling_enabled: Optional[bool] = None
-    sampling_rate: Optional[float] = None
-    # Profiles
-    profiles: Optional[Dict[str, Any]] = None
-    active_profile: Optional[str] = None
-    # Quarantine
-    quarantine_enabled: Optional[bool] = None
-    quarantine_failure_threshold: Optional[int] = None
-    quarantine_duration: Optional[float] = None
-    quarantine_reset_on_success: Optional[bool] = None
+    # sampling
+    sampling_enabled: bool = False
+    sampling_rate: float = 1.0
+    # quarantine
+    quarantine_enabled: bool = False
+    quarantine_failure_threshold: int = 3
+    quarantine_duration: float = 300.0
+    # escalation
+    escalation_enabled: Optional[bool] = None
+    escalation_threshold: Optional[int] = None
+    escalation_cooldown: Optional[float] = None
+    escalation_hooks: Optional[List[str]] = None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "FileConfig":
-        allowed = {f.name for f in cls.__dataclass_fields__.values()}
-        filtered = {k: v for k, v in data.items() if k in allowed}
+    def from_dict(cls, data: dict) -> "FileConfig":
+        known = cls.__dataclass_fields__.keys()
+        filtered = {k: v for k, v in data.items() if k in known}
         return cls(**filtered)
 
 
 def load_config(path: str) -> FileConfig:
-    """Load a FileConfig from a JSON file. Returns defaults if file not found."""
     if not os.path.exists(path):
         return FileConfig()
-    with open(path, "r") as fh:
-        data = json.load(fh)
+    with open(path) as fh:
+        data: Dict[str, Any] = json.load(fh)
     return FileConfig.from_dict(data)
