@@ -1,53 +1,99 @@
-"""File-based configuration loader for retryctl."""
-
+"""File-based configuration dataclass for retryctl."""
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+import json
+import os
 
 
 @dataclass
 class FileConfig:
-    """Represents the parsed content of a retryctl config file."""
-
-    max_attempts: int = 3
-    initial_delay: float = 1.0
-    max_delay: float = 60.0
-    multiplier: float = 2.0
-    jitter: Dict[str, Any] = field(default_factory=dict)
-    condition: Dict[str, Any] = field(default_factory=dict)
-    timeout: Dict[str, Any] = field(default_factory=dict)
-    throttle: Dict[str, Any] = field(default_factory=dict)
-    budget: Dict[str, Any] = field(default_factory=dict)
-    circuit_breaker: Dict[str, Any] = field(default_factory=dict)
-    concurrency: Dict[str, Any] = field(default_factory=dict)
-    checkpoint: Dict[str, Any] = field(default_factory=dict)
-    warmup: Dict[str, Any] = field(default_factory=dict)
-    labels: Dict[str, Any] = field(default_factory=dict)
-    trace: Dict[str, Any] = field(default_factory=dict)
-    audit: Dict[str, Any] = field(default_factory=dict)
-    policy: Dict[str, Any] = field(default_factory=dict)
-    profiles: Dict[str, Any] = field(default_factory=dict)
-    sampling: Dict[str, Any] = field(default_factory=dict)
+    # Backoff
+    initial_delay: Optional[float] = None
+    max_delay: Optional[float] = None
+    multiplier: Optional[float] = None
+    max_attempts: Optional[int] = None
+    # Alert
+    alert_command: Optional[str] = None
+    alert_on_failure: Optional[bool] = None
+    # Runner
+    command: Optional[List[str]] = None
+    # Condition
+    retry_exit_codes: Optional[List[int]] = None
+    retry_output_patterns: Optional[List[str]] = None
+    # Timeout
+    attempt_timeout: Optional[float] = None
+    total_timeout: Optional[float] = None
+    # Throttle
+    throttle_enabled: Optional[bool] = None
+    throttle_threshold: Optional[int] = None
+    throttle_window: Optional[float] = None
+    # Jitter
+    jitter_strategy: Optional[str] = None
+    jitter_max: Optional[float] = None
+    # Labels
+    labels: Optional[Dict[str, str]] = None
+    job_name: Optional[str] = None
+    # Budget
+    budget_enabled: Optional[bool] = None
+    budget_max_retries: Optional[int] = None
+    budget_window: Optional[float] = None
+    # Dead letter
+    deadletter_enabled: Optional[bool] = None
+    deadletter_path: Optional[str] = None
+    # Snapshot
+    snapshot_enabled: Optional[bool] = None
+    snapshot_path: Optional[str] = None
+    # Circuit breaker
+    circuit_breaker_enabled: Optional[bool] = None
+    circuit_breaker_failure_threshold: Optional[int] = None
+    circuit_breaker_recovery_timeout: Optional[float] = None
+    # Concurrency
+    max_concurrency: Optional[int] = None
+    # Drain
+    drain_enabled: Optional[bool] = None
+    drain_signal: Optional[str] = None
+    drain_timeout: Optional[float] = None
+    # Checkpoint
+    checkpoint_enabled: Optional[bool] = None
+    checkpoint_path: Optional[str] = None
+    # Trace
+    trace_enabled: Optional[bool] = None
+    trace_header_name: Optional[str] = None
+    trace_id: Optional[str] = None
+    # Warmup
+    warmup_enabled: Optional[bool] = None
+    warmup_attempts: Optional[int] = None
+    warmup_delay: Optional[float] = None
+    # Policy
+    policy_name: Optional[str] = None
+    # Audit
+    audit_enabled: Optional[bool] = None
+    audit_output_file: Optional[str] = None
+    # Sampling
+    sampling_enabled: Optional[bool] = None
+    sampling_rate: Optional[float] = None
+    # Profiles
+    profiles: Optional[Dict[str, Any]] = None
+    active_profile: Optional[str] = None
+    # Quarantine
+    quarantine_enabled: Optional[bool] = None
+    quarantine_failure_threshold: Optional[int] = None
+    quarantine_duration: Optional[float] = None
+    quarantine_reset_on_success: Optional[bool] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "FileConfig":
-        known = {
-            "max_attempts", "initial_delay", "max_delay", "multiplier",
-            "jitter", "condition", "timeout", "throttle", "budget",
-            "circuit_breaker", "concurrency", "checkpoint", "warmup",
-            "labels", "trace", "audit", "policy", "profiles", "sampling",
-        }
-        filtered = {k: v for k, v in data.items() if k in known}
+        allowed = {f.name for f in cls.__dataclass_fields__.values()}
+        filtered = {k: v for k, v in data.items() if k in allowed}
         return cls(**filtered)
 
 
-def load_config(path: Optional[str]) -> FileConfig:
-    """Load a FileConfig from a JSON file path, or return defaults."""
-    if path is None:
+def load_config(path: str) -> FileConfig:
+    """Load a FileConfig from a JSON file. Returns defaults if file not found."""
+    if not os.path.exists(path):
         return FileConfig()
-    text = Path(path).read_text()
-    data = json.loads(text)
+    with open(path, "r") as fh:
+        data = json.load(fh)
     return FileConfig.from_dict(data)
